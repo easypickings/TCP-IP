@@ -1,0 +1,49 @@
+2. ARP is implemented to find the destination MAC address
+    when sending to the IP addresses that are in the same
+    subnet with the source.
+   If destination is not in the same subnet, check the
+    routing table and route the packet. (destination MAC
+    address is the corresponding next hop MAC address in
+    the case.)
+
+3. The routing algorithem "NRP" is based on the distance
+    vector algorithem. The NRP packet is defined as below,
+    each line stands for 8 bytes
+     ________________________________________
+    |num |flag|        MAC address           |
+    |   IP prefix      |  slash   |   dist   |
+    |   IP prefix      |  slash   |   dist   |
+    |........................................|
+    |___IP prefix______|__slash___|___dist___|
+
+    The first line is the header and each line below is a
+    record.
+
+    -num: number of records, max is NRP_MAX_REC(185),
+            considering the max length of ethernet frame.
+            (it's a naive design for now.)
+    -flag: NRP_NEW_PKT(1) or NRP_OLD_PKT(0), see below.
+
+   When a host is newly added to the network, it adds its
+    local devices to its routing table. Then it encapsulate
+    its whole routing table into a NRP packet, and set the
+    flag as NRP_NEW_PKT.
+   When a host receives a NRP packet, it first uses records
+    in the packet to update its own routing table. Then it
+    do the following two things:
+    (1) Check the flag of the packet. If it is NRP_NEW_PKT,
+        it encapsulate its whole routing table into a NRP
+        packet (flag = NRP_OLD_PKT), and send the packet
+        back to the source.
+    (2) It encapsulate all the updated routing items into a
+        NRP packet (flag = NRP_OLD_PKT), and send it to all
+        the neighbors that are not in the same subnet with
+        it (by using all the devices except the device that
+        received the packet to send).
+
+4. An special ethernet frame type is defined for NRP packet
+    (#define ETHERTYPE_NRP 0x1106). When hosts not running
+    this protocol stack receives the frame, they check the
+    ether_type field in the frame and they can't find the
+    corresponding type. So they think the frame is damaged
+    and they just discard it.
