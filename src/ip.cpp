@@ -4,12 +4,6 @@
 
 IPPacketReceiveCallback ipupcallback = nullptr;
 
-bool inSameSubnet(const in_addr src, const in_addr dest,
-                  const in_addr mask)
-{
-    return (src.s_addr & mask.s_addr) == (dest.s_addr & mask.s_addr);
-}
-
 int setIPPacketReceiveCallback(IPPacketReceiveCallback callback)
 {
     ipupcallback = callback;
