@@ -6,8 +6,7 @@ int defaultCallback(const void *buf, int len)
 {
     char *cstr = (char *)buf;
     cstr[len] = 0;
-    printf("IP Callbeck Message: %s", cstr);
-    printf("\n\n");
+    printf("IP Callback Message: %s\n\n", cstr);
     return 0;
 }
 
@@ -43,7 +42,7 @@ void printHelp()
         "\tp Print routing table.\n"
         "\tn Route with NRP.\n"
         "\tw Print IP-MAC address map.\n"
-        "\te Exit.\n");
+        "\te Exit.\n\n");
 }
 
 void shell()
