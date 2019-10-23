@@ -24,7 +24,7 @@ struct Routing
         dist = UINT16_MAX;
     }
     Routing(const in_addr &_ip, const in_addr &_mask, const MAC &_MAC,
-            pDevice _pdev, unsigned int _dist = UINT16_MAX)
+            pDevice _pdev, unsigned int _dist = 1)
     {
         ipprefix.s_addr = _ip.s_addr & _mask.s_addr;
         mask.s_addr = _mask.s_addr;
