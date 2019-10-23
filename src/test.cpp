@@ -29,13 +29,31 @@ void str2mac(u_char *mac, const char *str)
         mac[i] = static_cast<u_char>(tmp[i]);
 }
 
+void printHelp()
+{
+    printf(
+        "Help Page\n\n"
+        "\th This help.\n"
+        "\ti Information about open devices.\n"
+        "\to Open a device.\n"
+        "\ta Open all the devices on the host.\n"
+        "\tc Change current device.\n"
+        "\ts Send a packet on current device.\n"
+        "\tr Add an item to routing table.\n"
+        "\tp Print routing table.\n"
+        "\tn Route with NRP.\n"
+        "\tw Print IP-MAC address map.\n"
+        "\te Exit.\n");
+}
+
 void shell()
 {
     pDevice pcurdev = nullptr;
     std::string op;
+    printHelp();
     while (1)
     {
-        printf(">>> ");
+        // printf(">>> ");
         fflush(stdout);
         std::getline(std::cin, op);
         if (op == "")
@@ -43,18 +61,7 @@ void shell()
 
         if (op == "h")
         {
-            printf(
-                "HELP\n\n"
-                "\th This help.\n"
-                "\ti Information about open devices.\n"
-                "\to Open a device.\n"
-                "\ta Open all the devices on the host.\n"
-                "\tc Change current device.\n"
-                "\ts Send a packet on current device.\n"
-                "\tr Add an item to routing table.\n"
-                "\tp Print routing table.\n"
-                "\tw Print IP-MAC address map.\n"
-                "\te Exit.\n");
+            printHelp();
         }
 
         else if (op == "i")
@@ -204,6 +211,11 @@ void shell()
         else if (op == "p")
         {
             router.print();
+        }
+
+        else if (op == "n")
+        {
+            router.route();
         }
 
         else if (op == "w")

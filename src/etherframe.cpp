@@ -28,9 +28,9 @@ int EtherCallback(const void *buf, int len, int id)
     if (payloadlen == 0)
         return 0;
 
-    MAC smac(peth.Frame.header.ether_shost);
-    MAC dmac(peth.Frame.header.ether_dhost);
-    uint16_t ether_type = peth.Frame.header.ether_type;
+    MAC smac(peth.hdr.ether_shost);
+    MAC dmac(peth.hdr.ether_dhost);
+    uint16_t ether_type = peth.hdr.ether_type;
 
     pDevice pdev = hub.getpDevice(id);
     MAC SelfMAC = pdev->macaddr;
@@ -41,22 +41,18 @@ int EtherCallback(const void *buf, int len, int id)
     if (not(dmac == SelfMAC || dmac == BroadCastMAC))
         return 0;
 
-    // printf("\n########EtherFrame#########\n");
-    // printf("src mac: %s\n", smac.str().c_str());
-    // printf("dst mac: %s\n", dmac.str().c_str());
-    // printf("ether_type: 0x%04x\n", ether_type);
-    // printf("frame len: %d\n", peth.len);
+    // peth.print();
 
     switch (ether_type)
     {
     case ETHERTYPE_IP:
-        return IPCallback(peth.Frame.payload, payloadlen, id);
+        return IPCallback(peth.payload, payloadlen, id);
 
     case ETHERTYPE_ARP:
-        return ARPCallback(peth.Frame.payload, payloadlen, id);
+        return ARPCallback(peth.payload, payloadlen, id);
 
     case ETHERTYPE_NRP:
-        return NRPCallback(peth.Frame.payload, payloadlen, id);
+        return NRPCallback(peth.payload, payloadlen, id);
 
     default:
         // printf("Ether_Type Unsupported\n");

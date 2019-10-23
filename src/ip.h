@@ -84,6 +84,19 @@ struct IPPacket
         auto res = getChecksum(&hdr, hdr.ip_hl * 4);
         return res == 0;
     }
+
+    void print()
+    {
+        printf("######## IP Packet ########\n");
+        printf("src ip: %s\n", inet_ntoa(hdr.ip_src));
+        printf("dst ip: %s\n", inet_ntoa(hdr.ip_dst));
+        printf("version: %d\n", hdr.ip_v);
+        printf("ihl: %d\n", hdr.ip_hl);
+        printf("protocol: 0x%x\n", hdr.ip_p);
+        printf("ttl: %d\n", hdr.ip_ttl);
+        printf("total len: %d\n", hdr.ip_len);
+        printf("###########################\n");
+    }
 };
 
 /**

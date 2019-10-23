@@ -53,6 +53,21 @@ struct ARPFrame
         hdr.ar_pro = ntohs(hdr.ar_pro);
         hdr.ar_op = ntohs(hdr.ar_op);
     }
+
+    void print()
+    {
+        printf("######## ARPPacket ########\n");
+        printf("ar_hrd: %u\n", hdr.ar_hrd);
+        printf("ar_pro: 0x%04x\n", hdr.ar_pro);
+        printf("ar_hln: %u\n", hdr.ar_hln);
+        printf("ar_pln: %u\n", hdr.ar_pln);
+        printf("ar_op: %u\n", hdr.ar_op);
+        printf("sha: %s\n", mac2str(srcMAC).c_str());
+        printf("spa: %s\n", inet_ntoa(srcIP));
+        printf("tha: %s\n", mac2str(dstMAC).c_str());
+        printf("tpa: %s\n", inet_ntoa(dstIP));
+        printf("###########################\n");
+    }
 };
 
 struct ARPMap
@@ -72,7 +87,7 @@ struct ARPMap
         for (auto m : ip_mac_map)
         {
             std::string ip = inet_ntoa(m.first);
-            printf("[%s]\t[%s]\n",
+            printf("%s\t%s\n",
                    ip.c_str(), m.second.str().c_str());
         }
     }

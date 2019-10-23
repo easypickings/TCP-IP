@@ -63,15 +63,7 @@ int IPCallback(const void *buf, int len, int id)
         }
     }
 
-    printf("\n#########IPPacket##########\n");
-    printf("src ip: %s\n", inet_ntoa(srcip));
-    printf("dst ip: %s\n", inet_ntoa(destip));
-    printf("version: %d\n", ppkt.hdr.ip_v);
-    printf("ihl: %d\n", ppkt.hdr.ip_hl);
-    printf("protocol: 0x%x\n", ppkt.hdr.ip_p);
-    printf("ttl: %d\n", ppkt.hdr.ip_ttl);
-    printf("total len: %d\n", ppkt.hdr.ip_len);
-
+    ppkt.print();
     if (ipupcallback)
         return ipupcallback(ppkt.ippayload, ppkt.getPayloadLen());
     return 0;
@@ -219,65 +211,61 @@ int NRPCallback(const void *buf, int len, int id)
     }
     NRPPacket pnrp(buf, len);
     pnrp.ntoh();
+    // pnrp.print();
 
     uint8_t num = pnrp.hdr.num;
     MAC mac(pnrp.hdr.mac);
-    pDevice pdev = hub.getpDevice(id);
+    pDevice pcurdev = hub.getpDevice(id);
 
     // Record updated routings
     NRPRecord updated[NRP_MAX_REC];
-    uint8_t upnum = 0;
+    uint8_t up = 0;
 
     // Update routing table
     for (int i = 0; i < num; ++i)
     {
-        NRPRecord record = pnrp.records[i];
+        NRPRecord record;
+        record = pnrp.records[i];
         bool handled = false;
-        for (auto &routing : router.table)
-        {
+        for (auto &r : router.table)
             // If there exists a routing with exactly
             // the same address range with the record
-            if (record.ipprefix.s_addr == routing.ipprefix.s_addr &&
-                record.slash == routing.slash)
+            if (record.ipprefix.s_addr == r.ipprefix.s_addr &&
+                record.slash == r.slash)
             {
                 // If the record is a better
                 // routing way, update the routing
-                if (record.dist + 1 < routing.dist)
+                if (record.dist + 1 < r.dist)
                 {
-                    routing.nexthopMAC = mac;
-                    routing.pdev = pdev;
-                    routing.dist = record.dist + 1;
+                    r.nexthopMAC = mac;
+                    r.pdev = pcurdev;
+                    r.dist = record.dist + 1;
 
                     // Add a updated record
-                    if (upnum < NRP_MAX_REC) // Only store first NRP_MAX_REC updates
+                    if (up < NRP_MAX_REC)
                     {
-                        updated[upnum].ipprefix = routing.ipprefix;
-                        updated[upnum].slash = routing.slash;
-                        updated[upnum].dist = routing.dist;
-                        upnum += 1;
+                        updated[up] = NRPRecord(r);
+                        up += 1;
                     }
                 }
                 handled = true;
                 break;
             }
-        }
 
         // If there is no perfectly
         // matching, add a new routing.
         if (!handled)
         {
             in_addr mask = slash2mask(record.slash);
-            Routing r(record.ipprefix, mask, mac, pdev);
-            r.dist = record.dist + 1;
+            Routing r(record.ipprefix, mask, mac,
+                      pcurdev, record.dist + 1);
             router.table.insert(r);
 
             // Add a updated record
-            if (upnum < NRP_MAX_REC) // Only store first NRP_MAX_REC updates
+            if (up < NRP_MAX_REC)
             {
-                updated[upnum].ipprefix = r.ipprefix;
-                updated[upnum].slash = r.slash;
-                updated[upnum].dist = r.dist;
-                upnum += 1;
+                updated[up] = NRPRecord(r);
+                up += 1;
             }
         }
     }
@@ -300,45 +288,26 @@ int NRPCallback(const void *buf, int len, int id)
     //        don't response to its "new" NRP packet, then when there
     //        is no cycle in the topology, the new host will never get
     //        any other routing information.)
-    NRPPacket nrppacket;
-    nrppacket.hdr.num = upnum;
-    nrppacket.hdr.flag = NRP_OLD_PKT;
-    memcpy(nrppacket.records, updated, sizeof(nrppacket.records));
 
-    for (auto &device : hub.pdevices)
+    for (auto &pdev : hub.pdevices)
         // Exclude the device with `id`
-        if (device != pdev)
-        {
-            memcpy(nrppacket.hdr.mac, device->macaddr.addr, ETHER_ADDR_LEN);
-            int nrppacketlen = sizeof(nrppacket.hdr) +
-                               sizeof(NRPRecord) * nrppacket.hdr.num;
-            nrppacket.hton();
-            hub.sendFrame(&nrppacket, nrppacketlen,
-                          ETHERTYPE_NRP, BroadCastMAC, device);
-        }
+        if (pdev != pdev)
+            // Broadcast updated messages
+            sendNRPPacket(up, NRP_OLD_PKT, pdev, updated);
 
     // Response to a "new" NRP packet
     if (pnrp.hdr.flag == NRP_NEW_PKT)
     {
-        // Ouch! Have to copy the routing table into a NRPRecord array!
-        NRPPacket response;
-        int rnum = 0;
-        for (auto &routing : router.table)
+        // Ouch! Have to copy routing table into NRPRecords!
+        NRPRecord whole[NRP_MAX_REC];
+        int n = 0;
+        for (auto &r : router.table)
         {
-            response.records[rnum].ipprefix = routing.ipprefix;
-            response.records[rnum].slash = routing.slash;
-            response.records[rnum].dist = routing.dist;
-            rnum += 1;
-            if (rnum == NRP_MAX_REC) // Can only take NRP_MAX_REC records
+            whole[n] = NRPRecord(r);
+            n += 1;
+            if (n == NRP_MAX_REC)
                 break;
         }
-        response.hdr.num = rnum;
-        response.hdr.flag = NRP_OLD_PKT;
-        memcpy(response.hdr.mac, pdev->macaddr.addr, ETHER_ADDR_LEN);
-
-        int responselen = sizeof(response.hdr) +
-                          sizeof(NRPRecord) * response.hdr.num;
-        response.hton();
-        hub.sendFrame(&response, responselen, ETHERTYPE_NRP, mac, pdev);
+        sendNRPPacket(n, NRP_OLD_PKT, pcurdev, whole, mac);
     }
 }

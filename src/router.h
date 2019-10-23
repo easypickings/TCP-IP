@@ -76,7 +76,7 @@ struct RoutingTable
         }
     }
 
-    void autoinit();
+    void route();
 
     void print()
     {
@@ -109,10 +109,33 @@ extern RoutingTable router;
 
 struct NRPRecord
 {
-    in_addr ipprefix;
-    uint16_t slash;
-    uint16_t dist;
-} __attribute__((__packed__));
+    struct
+    {
+        in_addr ipprefix;
+        uint16_t slash;
+        uint16_t dist;
+    } __attribute__((__packed__));
+
+    NRPRecord() : slash(32), dist(UINT16_MAX) { ipprefix.s_addr = 0; }
+    NRPRecord(const in_addr &_ip, const uint16_t _slash,
+              const uint16_t _dist)
+        : ipprefix(_ip), slash(_slash), dist(_dist) {}
+    NRPRecord(const Routing &r)
+        : ipprefix(r.ipprefix), slash(r.slash), dist(r.dist) {}
+
+    const NRPRecord &operator=(const NRPRecord &r)
+    {
+        ipprefix = r.ipprefix;
+        slash = r.slash;
+        dist = r.dist;
+        return *this;
+    }
+
+    void print()
+    {
+        printf("%s/%u: %u\n", inet_ntoa(ipprefix), slash, dist);
+    }
+};
 
 struct NRPPacket
 {
@@ -136,6 +159,29 @@ struct NRPPacket
         memcpy(&hdr, buf, len);
     }
 
+    int getLen() { return sizeof(hdr) + hdr.num * sizeof(NRPRecord); }
+
+    void setHeader(const uint8_t num, const uint8_t flag,
+                   const MAC &mac)
+    {
+        hdr.num = num;
+        hdr.flag = flag;
+        memcpy(hdr.mac, mac.addr, ETHER_ADDR_LEN);
+    }
+
+    int setPayload(const NRPRecord *r, const uint8_t n)
+    {
+        if (n > NRP_MAX_REC)
+        {
+            printf("NRPPayload Oversize!\n");
+            return -1;
+        }
+
+        for (int i = 0; i < n; ++i)
+            records[i] = r[i];
+        return 0;
+    }
+
     void hton()
     {
         for (int i = 0; i < hdr.num; ++i)
@@ -153,6 +199,23 @@ struct NRPPacket
             records[i].dist = ntohs(records[i].dist);
         }
     }
+
+    void print()
+    {
+        printf("######## NRPPacket ########\n");
+        printf("num: %u    flag: %u\n"
+               "mac: %s\n",
+               hdr.num, hdr.flag,
+               mac2str(hdr.mac).c_str());
+
+        for (int i = 0; i < hdr.num; ++i)
+            records[i].print();
+        printf("###########################\n");
+    }
 };
+
+int sendNRPPacket(const uint8_t num, const uint8_t flag,
+                  pDevice pdev, const NRPRecord *records,
+                  const MAC &dst = BroadCastMAC);
 
 #endif

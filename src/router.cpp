@@ -21,40 +21,33 @@ in_addr slash2mask(uint16_t slash)
     return ip;
 }
 
-void RoutingTable::autoinit()
+void RoutingTable::route()
 {
-    // Add local routings to routing table
-    for (auto &pdev : hub.pdevices)
+    // Encapsulate local routings into NRPRecords
+    NRPRecord local[NRP_MAX_REC];
+    int num = 0;
+    for (auto &r : router.table)
     {
-        Routing r(pdev->ipaddr, pdev->netmask,
-                  pdev->macaddr, pdev);
-        r.dist = 0;
-        table.insert(r);
-    }
-
-    // print();
-
-    // Send a "new" NRP packet
-    NRPPacket request;
-    int rnum = 0;
-    for (auto &routing : router.table)
-    {
-        request.records[rnum].ipprefix = routing.ipprefix;
-        request.records[rnum].slash = routing.slash;
-        request.records[rnum].dist = routing.dist;
-        rnum += 1;
-        if (rnum == NRP_MAX_REC) // Can only take NRP_MAX_REC records
+        local[num] = NRPRecord(r);
+        num += 1;
+        if (num == NRP_MAX_REC)
             break;
     }
-    request.hdr.num = rnum;
-    request.hdr.flag = NRP_NEW_PKT;
 
+    // Broadcast a "new" NRP packet
     for (auto &pdev : hub.pdevices)
-    {
-        memcpy(request.hdr.mac, pdev->macaddr.addr, ETHER_ADDR_LEN);
-        int requestlen = sizeof(request.hdr) +
-                         sizeof(NRPRecord) * request.hdr.num;
-        request.hton();
-        hub.sendFrame(&request, requestlen, ETHERTYPE_NRP, BroadCastMAC, pdev);
-    }
+        sendNRPPacket(num, NRP_NEW_PKT, pdev, local);
+}
+
+int sendNRPPacket(const uint8_t num, const uint8_t flag,
+                  pDevice pdev, const NRPRecord *records,
+                  const MAC &dst)
+{
+    NRPPacket nrppacket;
+    nrppacket.setHeader(num, flag, pdev->macaddr);
+    nrppacket.setPayload(records, num);
+    int len = nrppacket.getLen();
+    nrppacket.hton();
+    int res = hub.sendFrame(&nrppacket, len, ETHERTYPE_NRP, dst, pdev);
+    return res;
 }

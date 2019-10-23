@@ -44,26 +44,26 @@ struct EtherFrame
 {
     struct
     {
-        ether_header header;
+        ether_header hdr;
         u_char payload[ETH_DATA_LEN];
-    } __attribute__((__packed__)) Frame;
+    } __attribute__((__packed__));
     int len;
 
-    EtherFrame() { memset(&Frame, 0, ETH_FRAME_LEN); }
+    EtherFrame() { memset(&hdr, 0, ETH_FRAME_LEN); }
     EtherFrame(const void *buf, int l)
     {
         if (l > ETH_FRAME_LEN)
             len = ETH_FRAME_LEN;
         else
             len = l;
-        memcpy(&Frame, buf, len);
+        memcpy(&hdr, buf, len);
     }
 
     void setHeader(const MAC &srcmac, const MAC &dstmac, uint16_t type)
     {
-        memcpy(Frame.header.ether_shost, srcmac.addr, ETHER_ADDR_LEN);
-        memcpy(Frame.header.ether_dhost, dstmac.addr, ETHER_ADDR_LEN);
-        Frame.header.ether_type = type;
+        memcpy(hdr.ether_shost, srcmac.addr, ETHER_ADDR_LEN);
+        memcpy(hdr.ether_dhost, dstmac.addr, ETHER_ADDR_LEN);
+        hdr.ether_type = type;
     }
 
     int setPayload(const void *buf, int l)
@@ -73,15 +73,25 @@ struct EtherFrame
             printf("EtherPayload Oversize!\n");
             return -1;
         }
-        memcpy(Frame.payload, buf, l);
+        memcpy(payload, buf, l);
         len = ETHER_HDR_LEN + l;
         return 0;
     }
 
     int getPayloadLen() { return len - ETHER_HDR_LEN; }
 
-    void hton() { Frame.header.ether_type = htons(Frame.header.ether_type); }
-    void ntoh() { Frame.header.ether_type = ntohs(Frame.header.ether_type); }
+    void hton() { hdr.ether_type = htons(hdr.ether_type); }
+    void ntoh() { hdr.ether_type = ntohs(hdr.ether_type); }
+
+    void print()
+    {
+        printf("###### EthernetFrame ######\n");
+        printf("src mac: %s\n", mac2str(hdr.ether_shost).c_str());
+        printf("dst mac: %s\n", mac2str(hdr.ether_dhost).c_str());
+        printf("ether_type: 0x%04x\n", hdr.ether_type);
+        printf("len: %d\n", len);
+        printf("###########################\n");
+    }
 };
 
 typedef int (*frameReceiveCallback)(const void *, int, int);
