@@ -63,7 +63,19 @@ struct ARPMap
 
     MAC findDestMAC(pDevice pdev, const in_addr &destip);
     int sendARPRequest(pDevice pdev, const in_addr &dest);
-    int sendARPReply(pDevice pdev, const in_addr &destip, const MAC &destmac);
+    int sendARPReply(pDevice pdev, const in_addr &destip,
+                     const MAC &destmac);
+
+    void print()
+    {
+        printf("IP Address\tMAC Address\n");
+        for (auto m : ip_mac_map)
+        {
+            std::string ip = inet_ntoa(m.first);
+            printf("[%s]\t[%s]\n",
+                   ip.c_str(), m.second.str().c_str());
+        }
+    }
 };
 
 extern ARPMap arpmap;

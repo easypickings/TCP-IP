@@ -4,9 +4,10 @@
 
 IPPacketReceiveCallback ipupcallback = nullptr;
 
-bool inSameSubnet(const in_addr src, const in_addr dest, const in_addr mask)
+bool inSameSubnet(const in_addr src, const in_addr dest,
+                  const in_addr mask)
 {
-    return ((src.s_addr & mask.s_addr) == (dest.s_addr & mask.s_addr));
+    return (src.s_addr & mask.s_addr) == (dest.s_addr & mask.s_addr);
 }
 
 int setIPPacketReceiveCallback(IPPacketReceiveCallback callback)
@@ -28,16 +29,6 @@ int IPCallback(const void *buf, int len, int id)
 
     in_addr srcip = ppkt.hdr.ip_src;
     in_addr destip = ppkt.hdr.ip_dst;
-    pDevice pdev = hub.getpDevice(id);
-
-    printf("\n#########IPPacket##########\n");
-    printf("src ip: %s\n", inet_ntoa(srcip));
-    printf("dst ip: %s\n", inet_ntoa(destip));
-    printf("version: %d\n", ppkt.hdr.ip_v);
-    printf("ihl: %d\n", ppkt.hdr.ip_hl);
-    printf("protocol: 0x%x\n", ppkt.hdr.ip_p);
-    printf("ttl: %d\n", ppkt.hdr.ip_ttl);
-    printf("total len: %d\n", ppkt.hdr.ip_len);
 
     // Routing...
     if (!hub.haveIP(destip))
@@ -47,21 +38,45 @@ int IPCallback(const void *buf, int len, int id)
             printf("TTL=0!\n");
             return -1;
         }
-
-        auto destpair = router.find(destip);
-        if (!destpair.first)
+        Routing r = router.find(destip);
+        if (!r.pdev)
         {
-            printf("Can't find routing!\n");
+            printf("Can't Find Routing!\n");
             return -1;
         }
-        pdev = destpair.first;
-        ppkt.hdr.ip_ttl -= 1;
-        int packetlen = ppkt.hdr.ip_len;
-        ppkt.hton();
-        ppkt.setChksum();
-        return hub.sendFrame(&ppkt, packetlen, ETHERTYPE_IP,
-                             destpair.second, pdev);
+        else
+        {
+            pDevice pdev = r.pdev;
+            MAC destMAC;
+            if (r.dist == 0) // MAP<IP, MAC> & ARP
+                destMAC = arpmap.findDestMAC(pdev, destip);
+            else // Routing
+                destMAC = r.nexthopMAC;
+            if (destMAC == BroadCastMAC)
+            {
+                printf("No Destination MAC!\n");
+                return -1;
+            }
+            else
+            {
+                ppkt.hdr.ip_ttl -= 1;
+                int packetlen = ppkt.hdr.ip_len;
+                ppkt.hton();
+                ppkt.setChksum();
+                return hub.sendFrame(&ppkt, packetlen, ETHERTYPE_IP,
+                                     destMAC, pdev);
+            }
+        }
     }
+
+    printf("\n#########IPPacket##########\n");
+    printf("src ip: %s\n", inet_ntoa(srcip));
+    printf("dst ip: %s\n", inet_ntoa(destip));
+    printf("version: %d\n", ppkt.hdr.ip_v);
+    printf("ihl: %d\n", ppkt.hdr.ip_hl);
+    printf("protocol: 0x%x\n", ppkt.hdr.ip_p);
+    printf("ttl: %d\n", ppkt.hdr.ip_ttl);
+    printf("total len: %d\n", ppkt.hdr.ip_len);
 
     if (ipupcallback)
         return ipupcallback(ppkt.ippayload, ppkt.getPayloadLen());
@@ -81,39 +96,30 @@ int IPCallback(const void *buf, int len, int id)
 int sendIPPacket(const in_addr &src, const in_addr &dest,
                  int proto, const void *buf, int len)
 {
-    pDevice pdev = hub.getpDevice(src);
-    if (!pdev)
+    if (!hub.haveIP(src))
     {
         printf("Invalid Source IP!\n");
         return -1;
     }
 
     // find the destination MAC address
-    int found = -1;
     MAC destMAC;
-    if (inSameSubnet(src, dest, pdev->netmask))
+    Routing r = router.find(dest);
+    if (!r.pdev)
     {
-        destMAC = arpmap.findDestMAC(pdev, dest);
-        if (destMAC == BroadCastMAC)
-        {
-            printf("Unavaliable dst MAC!\n");
-            return -1;
-        }
+        printf("Invalid Destination IP!\n");
+        return -1;
     }
-    else
+
+    pDevice pdev = r.pdev;
+    if (r.dist == 0) // MAP<IP, MAC> & ARP
+        destMAC = arpmap.findDestMAC(pdev, dest);
+    else // Routing
+        destMAC = r.nexthopMAC;
+    if (destMAC == BroadCastMAC)
     {
-        printf("Routing...\n");
-        auto addrpair = router.find(dest);
-        if (addrpair.first)
-        {
-            pdev = addrpair.first;
-            destMAC = addrpair.second;
-        }
-        else
-        {
-            printf("Unavaliable dst MAC!\n");
-            return -1;
-        }
+        printf("Invalid Destination MAC!\n");
+        return -1;
     }
 
     IPPacket packet;
@@ -124,17 +130,18 @@ int sendIPPacket(const in_addr &src, const in_addr &dest,
     packet.hton();
     packet.setChksum();
 
-    int res = hub.sendFrame(&packet, packetlen, ETHERTYPE_IP, destMAC, pdev);
-    if (res < 0)
-        printf("Packet Failed\n");
-    else
-        printf("Packet Sent\n");
+    int res = hub.sendFrame(&packet, packetlen, ETHERTYPE_IP,
+                            destMAC, pdev);
+    // if (res < 0)
+    //     printf("Packet Failed\n");
+    // else
+    //     printf("Packet Sent\n");
     return res;
 }
 
 /**
- * @brief Manully add an item to routing table. Useful when talking with real 
- * Linux machines.
+ * @brief Manully add an item to routing table. 
+ * Useful when talking with real Linux machines.
  * 
  * @param dest The destination IP prefix.
  * @param mask The subnet mask of the destination IP prefix.

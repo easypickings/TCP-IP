@@ -13,10 +13,18 @@ struct Routing
     uint16_t slash;
     mutable MAC nexthopMAC;
     mutable pDevice pdev;
-    mutable int dist;
+    mutable unsigned int dist;
 
-    Routing(const in_addr &_ip, const in_addr &_mask,
-            const MAC &_MAC, pDevice _pdev)
+    Routing()
+    {
+        ipprefix.s_addr = 0;
+        mask.s_addr = 0;
+        slash = 0;
+        pdev = nullptr;
+        dist = UINT16_MAX;
+    }
+    Routing(const in_addr &_ip, const in_addr &_mask, const MAC &_MAC,
+            pDevice _pdev, unsigned int _dist = UINT16_MAX)
     {
         ipprefix.s_addr = _ip.s_addr & _mask.s_addr;
         mask.s_addr = _mask.s_addr;
@@ -30,6 +38,7 @@ struct Routing
         }
         nexthopMAC = _MAC;
         pdev = _pdev;
+        dist = _dist;
     }
 
     bool includeIP(const in_addr &ip)
@@ -41,39 +50,49 @@ struct Routing
 
 // overloading < to implement longest prefix matching
 bool operator<(const Routing &a, const Routing &b);
-in_addr slash2mask(int slash);
+in_addr slash2mask(uint16_t slash);
 
 struct RoutingTable
 {
     std::set<Routing> table;
 
-    std::pair<pDevice, MAC> find(const in_addr &ip)
+    const Routing find(const in_addr &ip)
     {
-        pDevice pdev = nullptr;
-        MAC nextMAC;
-        for (auto routing : table)
-            if (routing.includeIP(ip))
-            {
-                pdev = routing.pdev;
-                nextMAC = routing.nexthopMAC;
-                break;
-            }
-        return std::make_pair(pdev, nextMAC);
+        for (auto r : table)
+            if (r.includeIP(ip))
+                return r;
+        Routing none;
+        return none;
     }
 
-    void init();
+    void init()
+    {
+        // Add local routings to routing table
+        for (auto &pdev : hub.pdevices)
+        {
+            Routing r(pdev->ipaddr, pdev->netmask,
+                      pdev->macaddr, pdev, 0);
+            table.insert(r);
+        }
+    }
+
+    void autoinit();
 
     void print()
     {
-        printf("Destination\tNetMask\tNextHopMAC\tDistance\tDevice\n");
+        printf("Destination     "
+               "NetMask         "
+               "NextHopMAC          "
+               "Device    "
+               "Distance\n");
         for (auto routing : table)
         {
             std::string ip = inet_ntoa(routing.ipprefix);
             std::string netmask = inet_ntoa(routing.mask);
-            printf("%s/%u\t%s\t%s\t%d\t%s\n",
+            printf("%s/%u\t%s\t%s   %s      %d\n",
                    ip.c_str(), routing.slash, netmask.c_str(),
                    routing.nexthopMAC.str().c_str(),
-                   routing.dist, routing.pdev->name.c_str());
+                   routing.pdev->name.c_str(), routing.dist);
         }
     }
 };

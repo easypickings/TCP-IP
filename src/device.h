@@ -49,7 +49,8 @@ struct Device
 
     int sendFrame(const EtherFrame &frame)
     {
-        if (pcap_inject(descr, reinterpret_cast<const void *>(&frame.Frame),
+        if (pcap_inject(descr,
+                        reinterpret_cast<const void *>(&frame.Frame),
                         frame.len) == -1)
         {
             pcap_perror(descr, 0);

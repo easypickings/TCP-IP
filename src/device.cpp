@@ -86,7 +86,7 @@ Device::Device(std::string name)
 
     id = current_id++;
     startSniffing();
- }
+}
 
 int Device::startSniffing()
 {
@@ -98,7 +98,8 @@ int Device::startSniffing()
         return -1;
 
     sniffingThread = std::thread(
-        [=]() { pcap_loop(descr, -1, receiveFrame, reinterpret_cast<u_char *>(pa)); });
+        [=]() { pcap_loop(descr, -1, receiveFrame,
+                          reinterpret_cast<u_char *>(pa)); });
 
     sniffing = true;
     return 0;

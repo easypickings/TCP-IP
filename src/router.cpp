@@ -11,7 +11,7 @@ bool operator<(const Routing &a, const Routing &b)
     return false;
 }
 
-in_addr slash2mask(int slash)
+in_addr slash2mask(uint16_t slash)
 {
     in_addr ip;
     if (slash == 0)
@@ -21,7 +21,7 @@ in_addr slash2mask(int slash)
     return ip;
 }
 
-void RoutingTable::init()
+void RoutingTable::autoinit()
 {
     // Add local routings to routing table
     for (auto &pdev : hub.pdevices)

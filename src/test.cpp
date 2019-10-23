@@ -46,24 +46,31 @@ void shell()
             printf(
                 "HELP\n\n"
                 "\th This help.\n"
-                "\ti Information about current device.\n"
+                "\ti Information about open devices.\n"
                 "\to Open a device.\n"
                 "\ta Open all the devices on the host.\n"
-                "\ts Send a packet on current device.\n"
                 "\tc Change current device.\n"
+                "\ts Send a packet on current device.\n"
                 "\tr Add an item to routing table.\n"
                 "\tp Print routing table.\n"
+                "\tw Print IP-MAC address map.\n"
                 "\te Exit.\n");
         }
 
         else if (op == "i")
         {
             if (!pcurdev)
-                printf("[WARN] No Current Device.\n");
+                printf("[WARN] No Device.\n");
             else
             {
-                printf("[INFO] ");
+                printf("[INFO] * ");
                 printDevice(pcurdev);
+                for (auto &pdev : hub.pdevices)
+                    if (pdev != pcurdev)
+                    {
+                        printf("[INFO]   ");
+                        printDevice(pdev);
+                    }
             }
             continue;
         }
@@ -80,7 +87,7 @@ void shell()
             else
             {
                 pcurdev = hub.getpDevice(id);
-                printf("[INFO] Current Device\t");
+                printf("[INFO] * ");
                 printDevice(pcurdev);
             }
             continue;
@@ -95,9 +102,34 @@ void shell()
             {
                 printf("[INFO] %d Device(s) Added.\n", cnt);
                 pcurdev = hub.getpDevice(0);
-                printf("[INFO] Current Device\t");
+                printf("[INFO] * ");
+                printDevice(pcurdev);
+                for (auto &pdev : hub.pdevices)
+                    if (pdev != pcurdev)
+                    {
+                        printf("[INFO]   ");
+                        printDevice(pdev);
+                    }
+            }
+            // Add local routings
+            router.init();
+            continue;
+        }
+
+        else if (op == "c")
+        {
+            std::string name;
+            printf("[INPT] Device Name: ");
+            std::getline(std::cin, name);
+            pDevice p = hub.getpDevice(name);
+            if (p)
+            {
+                pcurdev = p;
+                printf("[INFO] * ");
                 printDevice(pcurdev);
             }
+            else
+                printf("[WARN] Changing Device Failed.\n");
             continue;
         }
 
@@ -105,7 +137,7 @@ void shell()
         {
             if (!pcurdev)
             {
-                printf("[WARN] No Current Device.\n");
+                printf("[WARN] No Device.\n");
                 continue;
             }
 
@@ -125,23 +157,6 @@ void shell()
 
             if (sendIPPacket(srcip, dstip, IPPROTO_TCP, buf.c_str(), len) < 0)
                 printf("[WARN] Sending Packet Failed.\n");
-            continue;
-        }
-
-        else if (op == "c")
-        {
-            std::string name;
-            printf("[INPT] Device Name: ");
-            std::getline(std::cin, name);
-            pDevice p = hub.getpDevice(name);
-            if (p)
-            {
-                pcurdev = p;
-                printf("[INFO] Current Device\t");
-                printDevice(pcurdev);
-            }
-            else
-                printf("[WARN] Changing Device Failed.\n");
             continue;
         }
 
@@ -191,6 +206,11 @@ void shell()
             router.print();
         }
 
+        else if (op == "w")
+        {
+            arpmap.print();
+        }
+
         else if (op == "e")
         {
             exit(0);
@@ -209,40 +229,8 @@ int main(int argc, char *argv[])
 {
     setFrameReceiveCallback(EtherCallback);
     setIPPacketReceiveCallback(defaultCallback);
-    // std::string devicename;
-    // printf("[INP] Device Name: ");
-    // std::getline(std::cin, devicename);
-    // int id = addDevice(devicename.c_str());
+
     shell();
-
-    // hub.addAllDevices();
-
-    // pDevice pdev = hub.getpDevice(0);
-
-    // char *devName = argv[argc - 2];
-    // char *addr = argv[argc - 1];
-    // int id = addDevice(devName);
-    // // if (id < 0)
-    // //     return -1;
-    // pDevice pdev = hub.getpDevice(id);
-    // if (std::string(argv[argc - 3]) == "f")
-    // {
-
-    //     in_addr ip;
-    //     int res = inet_aton(addr, &ip);
-    //     // if (res < 0)
-    //     //     return -1;
-    //     u_char mac[ETHER_ADDR_LEN];
-    //     for (int i = 0; i < 6; ++i)
-    //         mac[i] = static_cast<u_char>(0xff);
-    //     int ans = arpmap.findDestMAC(pdev, ip, mac);
-    //     printf("ans %d\n", ans);
-    //     // if (ans >= 0)
-    //     printf("%s\n", mac2str(arpmap.ip_mac_map[ip]).c_str());
-    //     for (int i = 0; i < 6; ++i)
-    //         printf("%02x ", mac[i]);
-    // }
-
     hub.join();
     return 0;
 }

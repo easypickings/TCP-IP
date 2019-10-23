@@ -30,17 +30,15 @@ int ARPCallback(const void *buf, int len, int id)
     case ARPOP_REQUEST:
         if (parp.dstIP.s_addr == pdev->ipaddr.s_addr)
         {
-            printf("ARP Request Received\n");
+            // printf("ARP Request Received\n");
             MAC srcMAC(parp.srcMAC);
             arpmap.sendARPReply(pdev, parp.srcIP, srcMAC);
         }
         return 0;
 
     case ARPOP_REPLY:
-        printf("ARP Reply Received\n");
+        // printf("ARP Reply Received\n");
         arpmap.ip_mac_map[parp.srcIP] = MAC(parp.srcMAC);
-        printf("[%s]<======>[%s]\n", inet_ntoa(parp.srcIP),
-               mac2str(arpmap.ip_mac_map[parp.srcIP].addr).c_str());
         return 0;
 
     default:
@@ -77,10 +75,10 @@ int ARPMap::sendARPRequest(pDevice pdev, const in_addr &dest)
 
     int res = hub.sendFrame(&arpframe, sizeof(ARPFrame),
                             ETHERTYPE_ARP, BroadCastMAC, pdev);
-    if (res < 0)
-        printf("ARP Request Failed\n");
-    else
-        printf("ARP Request Sent\n");
+    // if (res < 0)
+    //     printf("ARP Request Failed\n");
+    // else
+    //     printf("ARP Request Sent\n");
 
     // if (cv.wait_for(lck, std::chrono::seconds(1),
     //                 [&] {auto it = ip_mac_map.find(dest);
@@ -110,9 +108,9 @@ int ARPMap::sendARPReply(pDevice pdev, const in_addr &destip,
 
     int res = hub.sendFrame(&arpframe, sizeof(ARPFrame),
                             ETHERTYPE_ARP, destmac, pdev);
-    if (res < 0)
-        printf("ARP Reply Failed\n");
-    else
-        printf("ARP Reply Sent\n");
+    // if (res < 0)
+        // printf("ARP Reply Failed\n");
+    // else
+        // printf("ARP Reply Sent\n");
     return res;
 }
