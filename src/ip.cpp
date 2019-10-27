@@ -291,7 +291,7 @@ int NRPCallback(const void *buf, int len, int id)
 
     for (auto &pdev : hub.pdevices)
         // Exclude the device with `id`
-        if (pdev != pdev)
+        if (pdev != pcurdev)
             // Broadcast updated messages
             sendNRPPacket(up, NRP_OLD_PKT, pdev, updated);
 
