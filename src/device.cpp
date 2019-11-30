@@ -1,7 +1,7 @@
 #include "device.h"
 
 DeviceHub hub;
-frameReceiveCallback callback;
+extern int EtherCallback(const void *buf, int len, int id);
 
 void receiveFrame(u_char *args, const struct pcap_pkthdr *header,
                   const u_char *packet)
@@ -10,30 +10,28 @@ void receiveFrame(u_char *args, const struct pcap_pkthdr *header,
     int len = header->len;
     if (len != header->caplen)
     {
-        printf("Data Lost!\n");
+        // printf("Data Lost!\n");
         return;
     }
-
-    if (callback != nullptr)
-        callback(packet, len, pa->id);
+    EtherCallback(packet, len, pa->id);
 }
 
 MAC getMACAddr(const char *if_name)
 {
-    ifreq ifinfo;
-    int found = -1;
-    strcpy(ifinfo.ifr_name, if_name);
-    int sd = socket(AF_INET, SOCK_DGRAM, 0);
-    int res = ioctl(sd, SIOCGIFHWADDR, &ifinfo);
-    close(sd);
+    MAC mac = BroadCastMAC;
 
-    if (res == 0 && ifinfo.ifr_hwaddr.sa_family == 1)
-    {
-        u_char mac[ETHER_ADDR_LEN];
-        memcpy(mac, ifinfo.ifr_hwaddr.sa_data, IFHWADDRLEN);
-        return MAC(mac);
-    }
-    return BroadCastMAC;
+    struct ifaddrs *ifap, *ifa;
+    struct sockaddr_ll *sa;
+    getifaddrs(&ifap);
+    for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+        if (ifa->ifa_addr->sa_family == AF_PACKET &&
+            std::string(ifa->ifa_name) == std::string(if_name))
+        {
+            sa = reinterpret_cast<struct sockaddr_ll *>(ifa->ifa_addr);
+            mac = MAC(sa->sll_addr);
+        }
+    freeifaddrs(ifap);
+    return mac;
 }
 
 std::pair<in_addr, in_addr> getIPAddr(const char *if_name)
@@ -66,7 +64,7 @@ std::pair<in_addr, in_addr> getIPAddr(const char *if_name)
 int Device::current_id = 0;
 
 Device::Device(std::string name)
-    : name(name), descr(nullptr), id(-1), sniffing(false)
+    : name(name), descr(nullptr), id(-1), sniff(false)
 {
     macaddr = getMACAddr(name.c_str());
     if (macaddr == BroadCastMAC)
@@ -84,38 +82,90 @@ Device::Device(std::string name)
     if (!descr)
         return;
 
+    {
+        std::lock_guard<std::mutex> lck(p_mtx);
+        for (int i = 0; i < 65536; ++i)
+            ports[i] = false; // All ports unallocated
+    }
+
     id = current_id++;
-    startSniffing();
+    startSniff();
+    startSend();
 }
 
-int Device::startSniffing()
+int Device::startSniff()
 {
-    if (sniffing)
+    if (sniff)
         return -1;
 
     pcapArgs *pa = new pcapArgs(id, name, macaddr.addr);
     if (!descr)
         return -1;
 
-    sniffingThread = std::thread(
+    sniffThread = std::thread(
         [=]() { pcap_loop(descr, -1, receiveFrame,
                           reinterpret_cast<u_char *>(pa)); });
 
-    sniffing = true;
+    sniff = true;
     return 0;
 }
 
-int Device::stopSniffing()
+int Device::stopSniff()
 {
-    if (!sniffing)
+    if (!sniff)
         return -1;
 
-    pthread_t pthread = sniffingThread.native_handle();
+    pthread_t pthread = sniffThread.native_handle();
     if (pthread_cancel(pthread))
         return -1;
-    sniffingThread.detach();
-    sniffing = false;
+    sniffThread.detach();
+    sniff = false;
     return 0;
+}
+
+int Device::startSend()
+{
+    if (!descr)
+        return -1;
+
+    sendThread = std::thread([&]() { loopSend(); });
+    return 0;
+}
+
+int Device::stopSend()
+{
+    pthread_t pthread = sendThread.native_handle();
+    if (pthread_cancel(pthread))
+        return -1;
+    sendThread.detach();
+    return 0;
+}
+
+int Device::loopSend()
+{
+    std::unique_lock<std::mutex> lck(cv_mtx);
+
+    while (true)
+    {
+        cv.wait(lck, [&]() { return sendq.size() > 0; });
+        while (sendq.size() > 0)
+        {
+            EtherFrame frame;
+            {
+                std::lock_guard<std::mutex> lk(q_mtx);
+                frame = sendq.front();
+                sendq.pop();
+            } // Lock the access to sendq
+
+            if (pcap_inject(descr,
+                            reinterpret_cast<const void *>(&frame),
+                            frame.len) == -1)
+            {
+                pcap_perror(descr, 0);
+                // printf("SEND FRAME FAILED\n");
+            }
+        }
+    }
 }
 
 /********************
@@ -124,10 +174,7 @@ int Device::stopSniffing()
 int DeviceHub::addDevice(std::string name)
 {
     if (findDevice(name) >= 0)
-    {
-        printf("Device Exists.\n");
         return -1;
-    }
 
     pDevice pdev = std::make_shared<Device>(name);
     if (pdev->id < 0)
@@ -174,6 +221,15 @@ int DeviceHub::sendFrame(const void *buf, int len, int ethtype,
         return -1;
     frame.hton();
     return pdev->sendFrame(frame);
+}
+
+void printDevice(pDevice pdev)
+{
+    std::string ipstr = inet_ntoa(pdev->ipaddr);
+    std::string maskstr = inet_ntoa(pdev->netmask);
+    printf("ID: %d\tName: %s\tMAC: %s\tIP: %s\tNetMask: %s\n",
+           pdev->id, pdev->name.c_str(), pdev->macaddr.str().c_str(),
+           ipstr.c_str(), maskstr.c_str());
 }
 
 int addDevice(const char *device)

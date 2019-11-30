@@ -10,7 +10,7 @@
 #include "device.h"
 #include <map>
 
-#define IP_DATA_LEN 65536
+#define IP_DATA_LEN 65515
 
 uint16_t getChecksum(const void *vdata, size_t length);
 
@@ -49,7 +49,7 @@ struct IPPacket
     {
         if (len > IP_DATA_LEN)
         {
-            printf("IPPayload Oversize!\n");
+            // printf("IPPayload Oversize!\n");
             return -1;
         }
         memcpy(ippayload, buf, len);
@@ -73,19 +73,19 @@ struct IPPacket
         hdr.ip_sum = ntohs(hdr.ip_sum);
     }
 
-    void setChksum()
+    void setChecksum()
     {
         hdr.ip_sum = 0;
         hdr.ip_sum = getChecksum(&hdr, hdr.ip_hl * 4);
     }
 
-    bool checkChksum()
+    bool chkChecksum()
     {
         auto res = getChecksum(&hdr, hdr.ip_hl * 4);
         return res == 0;
     }
 
-    void print()
+    void print() const
     {
         printf("######## IP Packet ########\n");
         printf("src ip: %s\n", inet_ntoa(hdr.ip_src));

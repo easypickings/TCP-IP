@@ -54,7 +54,7 @@ struct ARPFrame
         hdr.ar_op = ntohs(hdr.ar_op);
     }
 
-    void print()
+    void print() const
     {
         printf("######## ARPPacket ########\n");
         printf("ar_hrd: %u\n", hdr.ar_hrd);
@@ -73,8 +73,8 @@ struct ARPFrame
 struct ARPMap
 {
     std::map<in_addr, MAC> ip_mac_map;
-    // std::condition_variable cv;
-    // std::mutex mtx;
+    std::condition_variable cv;
+    std::mutex mtx;
 
     MAC findDestMAC(pDevice pdev, const in_addr &destip);
     int sendARPRequest(pDevice pdev, const in_addr &dest);

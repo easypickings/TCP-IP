@@ -173,7 +173,7 @@ struct NRPPacket
     {
         if (n > NRP_MAX_REC)
         {
-            printf("NRPPayload Oversize!\n");
+            // printf("NRPPayload Oversize!\n");
             return -1;
         }
 

@@ -1,5 +1,6 @@
-test: test.cpp device.o ip.o arp.o etherframe.o router.o
-	g++ -Og -g -o test test.cpp device.o ip.o arp.o etherframe.o router.o -lpcap -pthread -fsanitize=address
+testTCP: testTCPClient.cpp testTCPServer.cpp device.o ip.o arp.o etherframe.o router.o tcp.o socket.o
+	g++ -Og -g -o testTCPClient testTCPClient.cpp device.o ip.o arp.o etherframe.o router.o tcp.o socket.o -lpcap -pthread -fsanitize=address
+	g++ -Og -g -o testTCPServer testTCPServer.cpp device.o ip.o arp.o etherframe.o router.o tcp.o socket.o -lpcap -pthread -fsanitize=address
 device.o: device.cpp
 	g++ -c -Og -g -o device.o device.cpp -lpcap -pthread -fsanitize=address
 ip.o: ip.cpp
@@ -10,5 +11,10 @@ etherframe.o: etherframe.cpp
 	g++ -c -Og -g -o etherframe.o etherframe.cpp -lpcap -pthread -fsanitize=address
 router.o: router.cpp
 	g++ -c -Og -g -o router.o router.cpp -lpcap -pthread -fsanitize=address
+tcp.o: tcp.cpp
+	g++ -c -Og -g -o tcp.o tcp.cpp -lpcap -pthread -fsanitize=address
+socket.o: socket.cpp
+	g++ -c -Og -g -o socket.o socket.cpp -lpcap -pthread -fsanitize=address
+
 clean:
-	rm -rf test *.o
+	rm -rf testTCPClient testTCPServer *.o

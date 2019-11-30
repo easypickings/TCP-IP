@@ -2,11 +2,13 @@
 #include "arp.h"
 #include "router.h"
 
-IPPacketReceiveCallback ipupcallback = nullptr;
+IPPacketReceiveCallback ipcallback = nullptr;
+extern int TCPDispatcher(const void *buf, int len,
+                         const in_addr &sip, const in_addr &dip);
 
 int setIPPacketReceiveCallback(IPPacketReceiveCallback callback)
 {
-    ipupcallback = callback;
+    ipcallback = callback;
     return 0;
 }
 
@@ -14,9 +16,9 @@ int IPCallback(const void *buf, int len, int id)
 {
     IPPacket ppkt(buf, len);
     // Checksum?
-    if (!ppkt.checkChksum())
+    if (!ppkt.chkChecksum())
     {
-        printf("Checksum Error\n");
+        // printf("IP Checksum Error\n");
         return -1;
     }
     ppkt.ntoh();
@@ -29,13 +31,13 @@ int IPCallback(const void *buf, int len, int id)
     {
         if (ppkt.hdr.ip_ttl == 0)
         {
-            printf("TTL=0!\n");
+            // printf("TTL=0!\n");
             return -1;
         }
         Routing r = router.find(destip);
         if (!r.pdev)
         {
-            printf("Can't Find Routing!\n");
+            // printf("Can't Find Routing!\n");
             return -1;
         }
         else
@@ -48,25 +50,30 @@ int IPCallback(const void *buf, int len, int id)
                 destMAC = r.nexthopMAC;
             if (destMAC == BroadCastMAC)
             {
-                printf("No Destination MAC!\n");
+                // printf("No Destination MAC!\n");
                 return -1;
             }
             else
             {
+                // printf("Route a packet...\n");
+                // ppkt.print();
+
                 ppkt.hdr.ip_ttl -= 1;
                 int packetlen = ppkt.hdr.ip_len;
                 ppkt.hton();
-                ppkt.setChksum();
+                ppkt.setChecksum();
                 return hub.sendFrame(&ppkt, packetlen, ETHERTYPE_IP,
                                      destMAC, pdev);
             }
         }
     }
 
-    ppkt.print();
-    if (ipupcallback)
-        return ipupcallback(ppkt.ippayload, ppkt.getPayloadLen());
-    return 0;
+    // ppkt.print();
+    return TCPDispatcher(ppkt.ippayload, ppkt.getPayloadLen(),
+                         destip, srcip);
+    //     if (ipcallback)
+    //         return ipcallback(ppkt.ippayload, ppkt.getPayloadLen());
+    //     return 0;
 }
 
 /**
@@ -84,7 +91,7 @@ int sendIPPacket(const in_addr &src, const in_addr &dest,
 {
     if (!hub.haveIP(src))
     {
-        printf("Invalid Source IP!\n");
+        // printf("Invalid Source IP!\n");
         return -1;
     }
 
@@ -93,7 +100,7 @@ int sendIPPacket(const in_addr &src, const in_addr &dest,
     Routing r = router.find(dest);
     if (!r.pdev)
     {
-        printf("Invalid Destination IP!\n");
+        // printf("Invalid Destination IP!\n");
         return -1;
     }
 
@@ -104,7 +111,7 @@ int sendIPPacket(const in_addr &src, const in_addr &dest,
         destMAC = r.nexthopMAC;
     if (destMAC == BroadCastMAC)
     {
-        printf("Invalid Destination MAC!\n");
+        // printf("Invalid Destination MAC!\n");
         return -1;
     }
 
@@ -114,7 +121,7 @@ int sendIPPacket(const in_addr &src, const in_addr &dest,
         return -1;
     int packetlen = packet.hdr.ip_len;
     packet.hton();
-    packet.setChksum();
+    packet.setChecksum();
 
     int res = hub.sendFrame(&packet, packetlen, ETHERTYPE_IP,
                             destMAC, pdev);
@@ -206,7 +213,7 @@ int NRPCallback(const void *buf, int len, int id)
 {
     if (len % 8)
     {
-        printf("Wrong NRP Size!\n");
+        // printf("Wrong NRP Size!\n");
         return -1;
     }
     NRPPacket pnrp(buf, len);

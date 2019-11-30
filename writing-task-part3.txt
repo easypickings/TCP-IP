@@ -1,0 +1,16 @@
+1. A TCP finite state machine is implemented. TCP
+    state changes are handled in api functions
+    (connect, accpet, etc.) and receive function
+    that processes incoming TCP segments.
+
+2. Use Go-Back-N. On receiving a TCP segment with
+    a unwanted SEQ number, discard it and send a
+    duplicated ACK back to tell the sender to re-
+    transmit; On receiving a TCP segment with a
+    duplicated ACK number, resend the last segment.
+
+3. Evaluation.
+    ` make
+    ` ./testTCPClient [IP] [Port] or ./testTCPServer [IP] [Port]
+    ` # a little initialization (like open devices, find routes)
+    ` # start tranfer data

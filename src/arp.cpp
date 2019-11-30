@@ -55,8 +55,8 @@ MAC ARPMap::findDestMAC(pDevice pdev, const in_addr &destip)
 
 int ARPMap::sendARPRequest(pDevice pdev, const in_addr &dest)
 {
-    // std::unique_lock<std::mutex> lck(mtx);
-    // lck.lock();
+    std::unique_lock<std::mutex> lck(mtx);
+
     int found = -1;
 
     ARPFrame arpframe;
@@ -66,26 +66,22 @@ int ARPMap::sendARPRequest(pDevice pdev, const in_addr &dest)
 
     int res = hub.sendFrame(&arpframe, sizeof(ARPFrame),
                             ETHERTYPE_ARP, BroadCastMAC, pdev);
-    // if (res < 0)
-    //     printf("ARP Request Failed\n");
-    // else
-    //     printf("ARP Request Sent\n");
 
-    // if (cv.wait_for(lck, std::chrono::seconds(1),
-    //                 [&] {auto it = ip_mac_map.find(dest);
-    //                 return it != ip_mac_map.end(); }))
-    // {
-    //     auto it = ip_mac_map.find(dest);
-    //     if (it != ip_mac_map.end())
-    //         found = 0;
-    // }
-    // lck.unlock();
+    if (cv.wait_for(lck, std::chrono::seconds(1),
+                    [&]() {auto it = ip_mac_map.find(dest);
+                    return it != ip_mac_map.end(); }))
+    {
+        auto it = ip_mac_map.find(dest);
+        if (it != ip_mac_map.end())
+            found = 0;
+    }
+    lck.unlock();
 
-    sleep(1);
+    // sleep(1);
 
-    auto it = ip_mac_map.find(dest);
-    if (it != ip_mac_map.end())
-        found = 0;
+    // auto it = ip_mac_map.find(dest);
+    // if (it != ip_mac_map.end())
+    //     found = 0;
     return found;
 }
 
@@ -100,8 +96,8 @@ int ARPMap::sendARPReply(pDevice pdev, const in_addr &destip,
     int res = hub.sendFrame(&arpframe, sizeof(ARPFrame),
                             ETHERTYPE_ARP, destmac, pdev);
     // if (res < 0)
-        // printf("ARP Reply Failed\n");
+    // printf("ARP Reply Failed\n");
     // else
-        // printf("ARP Reply Sent\n");
+    // printf("ARP Reply Sent\n");
     return res;
 }

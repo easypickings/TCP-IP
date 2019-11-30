@@ -13,10 +13,13 @@ std::string mac2str(const u_char *mac)
     return s;
 }
 
-int setFrameReceiveCallback(frameReceiveCallback _callback)
+void str2mac(u_char *mac, const char *str)
 {
-    callback = _callback;
-    return 0;
+    int tmp[6] = {0};
+    sscanf(str, "%x:%x:%x:%x:%x:%x",
+           &tmp[0], &tmp[1], &tmp[2], &tmp[3], &tmp[4], &tmp[5]);
+    for (int i = 0; i < 6; ++i)
+        mac[i] = static_cast<u_char>(tmp[i]);
 }
 
 int EtherCallback(const void *buf, int len, int id)

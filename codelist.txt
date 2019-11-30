@@ -5,11 +5,16 @@ src/
     ip.h
     arp.h
     router.h
+    tcp.h
+    socket.h
   cpp source file:
     etherframe.cpp
     device.cpp
     ip.cpp
     arp.cpp
     router.cpp
-    test.cpp
+    tcp.cpp
+    socket.cpp
+    testTCPClient.cpp
+    testTCPServer.cpp
   makefile

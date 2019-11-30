@@ -13,6 +13,7 @@
 #define ETHERTYPE_NRP 0x1106 // EtherFrame type for NRP
 
 std::string mac2str(const u_char *mac);
+void str2mac(u_char *mac, const char *str);
 
 struct MAC
 {
@@ -70,11 +71,13 @@ struct EtherFrame
     {
         if (l > ETH_DATA_LEN)
         {
-            printf("EtherPayload Oversize!\n");
+            // printf("EtherPayload Oversize!\n");
             return -1;
         }
         memcpy(payload, buf, l);
         len = ETHER_HDR_LEN + l;
+        if (len < ETH_ZLEN)
+            len = ETH_ZLEN;
         return 0;
     }
 
@@ -83,7 +86,7 @@ struct EtherFrame
     void hton() { hdr.ether_type = htons(hdr.ether_type); }
     void ntoh() { hdr.ether_type = ntohs(hdr.ether_type); }
 
-    void print()
+    void print() const
     {
         printf("###### EthernetFrame ######\n");
         printf("src mac: %s\n", mac2str(hdr.ether_shost).c_str());
@@ -93,10 +96,6 @@ struct EtherFrame
         printf("###########################\n");
     }
 };
-
-typedef int (*frameReceiveCallback)(const void *, int, int);
-
-int setFrameReceiveCallback(frameReceiveCallback callback);
 
 int EtherCallback(const void *buf, int len, int id);
 
